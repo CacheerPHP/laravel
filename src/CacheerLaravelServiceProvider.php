@@ -13,6 +13,9 @@ use Illuminate\Support\ServiceProvider;
 
 class CacheerLaravelServiceProvider extends ServiceProvider
 {
+    /**
+     * Register bindings and configuration.
+     */
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/cacheer.php', 'cacheer');
@@ -30,6 +33,9 @@ class CacheerLaravelServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * Bootstrap resources and commands.
+     */
     public function boot(): void
     {
         $configPath = function_exists('config_path')

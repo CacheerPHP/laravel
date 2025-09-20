@@ -9,10 +9,19 @@ use Illuminate\Console\Command;
 
 class MonitorServeCommand extends Command
 {
+    /**
+     * Command signature.
+     */
     protected $signature = 'cacheer:monitor {--host=127.0.0.1} {--port=9966} {--events=}';
 
+    /**
+     * Command description.
+     */
     protected $description = 'Start the Cacheer Monitor dashboard';
 
+    /**
+     * Execute the command.
+     */
     public function handle(): int
     {
         if (! class_exists(MonitorApplication::class)) {
