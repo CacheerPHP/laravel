@@ -1,0 +1,1 @@
+{"version":2,"defects":{"Cacheer\\Laravel\\Tests\\Feature\\MonitorCommandTest::test_monitor_command_warns_when_monitor_missing":8},"times":{"Cacheer\\Laravel\\Tests\\Feature\\MonitorCommandTest::test_monitor_command_warns_when_monitor_missing":0.046,"Cacheer\\Laravel\\Tests\\Feature\\ServiceProviderTest::test_it_binds_cacheer_manager":0.002}}

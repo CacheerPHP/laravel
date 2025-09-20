@@ -15,7 +15,7 @@ class CacheerLaravelServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../config/cacheer.php', 'cacheer');
+        $this->mergeConfigFrom(__DIR__.'/../config/cacheer.php', 'cacheer');
 
         $this->app->singleton(CacheerManager::class, function (Application $app) {
             return new CacheerManager($app);
@@ -37,7 +37,7 @@ class CacheerLaravelServiceProvider extends ServiceProvider
             : $this->app->basePath('config/cacheer.php');
 
         $this->publishes([
-            __DIR__ . '/../config/cacheer.php' => $configPath,
+            __DIR__.'/../config/cacheer.php' => $configPath,
         ], 'cacheer-config');
 
         if ($this->app->runningInConsole()) {

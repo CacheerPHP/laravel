@@ -10,6 +10,7 @@ use Silviooosilva\CacheerPhp\Cacheer;
 class CacheerManager
 {
     private Cacheer $instance;
+
     private Application $app;
 
     public function __construct(Application $app)
@@ -33,7 +34,7 @@ class CacheerManager
         $instrumentedClass = '\\Cacheer\\Monitor\\InstrumentedCacheer';
         $reporterClass = '\\Cacheer\\Monitor\\Reporter\\JsonlReporter';
 
-        if (!class_exists($instrumentedClass) || !class_exists($reporterClass)) {
+        if (! class_exists($instrumentedClass) || ! class_exists($reporterClass)) {
             return;
         }
 
@@ -51,11 +52,11 @@ class CacheerManager
         $cacheer = new Cacheer($options);
         $this->applyDriver($cacheer, $driver);
 
-        if (!empty($config['compress'])) {
+        if (! empty($config['compress'])) {
             $cacheer->useCompression(true);
         }
 
-        if (!empty($config['encryption_key'])) {
+        if (! empty($config['encryption_key'])) {
             $cacheer->useEncryption((string) $config['encryption_key']);
         }
 
@@ -77,6 +78,7 @@ class CacheerManager
 
         if (isset($map[$driver])) {
             $driverManager->{$map[$driver]}();
+
             return;
         }
 

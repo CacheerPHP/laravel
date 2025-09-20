@@ -39,12 +39,16 @@
     }
   },
   "scripts": {
-   "test": [
-            "@test:refactor",
-            "@test:lint",
-            "@test:types",
-            "@test:unit"
-    ]
+    "test": [
+      "@test:refactor",
+      "@test:lint",
+      "@test:types",
+      "@test:unit"
+    ],
+    "test:refactor": "rector process --dry-run",
+    "test:lint": "./vendor/bin/pint",
+    "test:types": "phpstan analyse src tests",
+    "test:unit": "phpunit"
   },
   "minimum-stability": "stable"
 }
