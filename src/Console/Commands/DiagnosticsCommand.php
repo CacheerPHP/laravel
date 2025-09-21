@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Cacheer\Laravel\Console\Commands;
 
+use Cacheer\Laravel\Support\CacheerManager;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config;
-use Cacheer\Laravel\Support\CacheerManager;
 
 class DiagnosticsCommand extends Command
 {

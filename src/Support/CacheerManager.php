@@ -64,8 +64,6 @@ class CacheerManager
 
     /**
      * Build a Cacheer instance according to configuration values.
-     *
-     * @return Cacheer
      */
     private function createInstance(): Cacheer
     {
@@ -88,10 +86,6 @@ class CacheerManager
 
     /**
      * Apply the configured driver to the Cacheer instance.
-     *
-     * @param Cacheer $cacheer
-     * @param string $driver
-     * @return void
      */
     private function applyDriver(Cacheer $cacheer, string $driver): void
     {
