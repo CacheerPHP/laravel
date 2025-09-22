@@ -6,6 +6,9 @@ namespace Cacheer\Laravel\Facades;
 
 use Illuminate\Support\Facades\Facade;
 
+/**
+ * @mixin \Silviooosilva\CacheerPhp\Cacheer
+ */
 class Cacheer extends Facade
 {
     /**
