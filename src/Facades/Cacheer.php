@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Facade;
 
 /**
  * @author Sílvio Silva <https://github.com/silviooosilva>
- * @package Silviooosilva\CacheerPhp
+ *
  * @method static bool add(string $cacheKey, mixed $cacheData, string $namespace = '', int|string $ttl = 3600)
  * @method bool add(string $cacheKey, mixed $cacheData, string $namespace = '', int|string $ttl = 3600)
  * @method static bool appendCache(string $cacheKey, mixed $cacheData, string $namespace = '')
@@ -55,6 +55,7 @@ use Illuminate\Support\Facades\Facade;
  * @method setDriver(): CacheDriver
  * @method static setUp(array $options): void
  * @method setUp(array $options): void
+ *
  * @see \Silviooosilva\CacheerPhp\Cacheer
  */
 class Cacheer extends Facade
