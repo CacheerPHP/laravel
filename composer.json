@@ -4,6 +4,7 @@
   "keywords": ["cacheer", "cacheerphp", "laravel", "laravel-package", "laravel-integration", "cache", "caching"],
   "type": "library",
   "license": "MIT",
+  "version": "0.1.0",
   "authors": [
     {
       "name": "Silvio Silva",
@@ -22,9 +23,8 @@
   },
   "require": {
     "php": "^8.3.0",
-   "silviooosilva/cacheer-php": "^4.7 || ^5.0",
-    "laravel/framework": "^11.44.2|^12.29.0"
-
+    "silviooosilva/cacheer-php": "^4.7 || ^5.0",
+    "laravel/framework": "^10.0|^11.0|^12.0"
   },
   "require-dev": {
     "orchestra/testbench": "^10.6.0",

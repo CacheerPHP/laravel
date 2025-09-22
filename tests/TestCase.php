@@ -13,4 +13,11 @@ abstract class TestCase extends Orchestra
     {
         return [CacheerLaravelServiceProvider::class];
     }
+
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('cacheer.cache_dir', $app->storagePath('cacheer-tests'));
+        $app['config']->set('cacheer.default_driver', 'file');
+        $app['config']->set('cacheer.reporter.enabled', false);
+    }
 }
