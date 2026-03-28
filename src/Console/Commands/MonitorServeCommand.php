@@ -12,7 +12,10 @@ class MonitorServeCommand extends Command
     /**
      * Command signature.
      */
-    protected $signature = 'cacheer:monitor {--host=127.0.0.1} {--port=9966} {--events=}';
+    protected $signature = 'cacheer:monitor
+        {--host= : Host address for the monitor dashboard}
+        {--port= : Port for the monitor dashboard}
+        {--events= : Path to the JSONL events file}';
 
     /**
      * Command description.
@@ -30,14 +33,26 @@ class MonitorServeCommand extends Command
             return 1;
         }
 
+        $host = (string) ($this->option('host') ?? config('cacheer.monitor.host', '127.0.0.1'));
+        $port = (int) ($this->option('port') ?? config('cacheer.monitor.port', 9966));
+
+        if ($port < 1 || $port > 65535) {
+            $this->error("Invalid port: {$port}. Must be between 1 and 65535.");
+
+            return 1;
+        }
+
         $monitor = new MonitorApplication;
         $args = ['serve'];
-        $args[] = '--host='.$this->option('host');
-        $args[] = '--port='.(string) $this->option('port');
-        if ($this->option('events')) {
-            $args[] = '--events='.$this->option('events');
+        $args[] = '--host='.$host;
+        $args[] = '--port='.$port;
+
+        $events = $this->option('events') ?? config('cacheer.reporter.events');
+        if ($events) {
+            $args[] = '--events='.$events;
         }
-        if ((bool) $this->option('quiet')) {
+
+        if ($this->option('quiet')) {
             $args[] = '--quiet';
         }
 

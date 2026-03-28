@@ -16,13 +16,12 @@ class CacheerLaravelServiceProvider extends ServiceProvider
     /**
      * Register bindings and configuration.
      */
+    #[\Override]
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/cacheer.php', 'cacheer');
 
-        $this->app->singleton(CacheerManager::class, function (Application $app) {
-            return new CacheerManager($app);
-        });
+        $this->app->singleton(CacheerManager::class, fn (Application $app) => new CacheerManager($app));
 
         $this->app->alias(CacheerManager::class, 'cacheer');
 

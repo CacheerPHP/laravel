@@ -30,4 +30,38 @@ class EventsClearCommandTest extends TestCase
             ->expectsOutput('Failed to clear events. Status: 500')
             ->assertExitCode(1);
     }
+
+    public function test_events_clear_with_custom_endpoint(): void
+    {
+        Http::fake([
+            'http://custom.example.com/clear' => Http::response(['ok' => true], 200),
+        ]);
+
+        $this->artisan('cacheer:events-clear --endpoint=http://custom.example.com/clear')
+            ->expectsOutput('Events cleared successfully.')
+            ->assertExitCode(0);
+    }
+
+    public function test_events_clear_uses_config_endpoint(): void
+    {
+        $this->app['config']->set('cacheer.monitor.endpoint', 'http://configured.example.com/clear');
+
+        Http::fake([
+            'http://configured.example.com/clear' => Http::response(['ok' => true], 200),
+        ]);
+
+        $this->artisan('cacheer:events-clear')
+            ->expectsOutput('Events cleared successfully.')
+            ->assertExitCode(0);
+    }
+
+    public function test_events_clear_handles_connection_error(): void
+    {
+        Http::fake(function (): void {
+            throw new \Illuminate\Http\Client\ConnectionException('Connection refused');
+        });
+
+        $this->artisan('cacheer:events-clear')
+            ->assertExitCode(1);
+    }
 }

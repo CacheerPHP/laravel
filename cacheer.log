@@ -1,0 +1,16 @@
+[2026-03-08 02:17:33] [DEBUG] Cache stored successfully from Array driver.
+[2026-03-08 02:17:33] [DEBUG] Cache key: test-key exists and it's available! from array driver.
+[2026-03-08 02:17:33] [DEBUG] Cache key: test-key exists and it's available! from array driver.
+[2026-03-08 02:17:33] [DEBUG] Cache retrieved successfully from array driver.
+[2026-03-08 02:17:52] [DEBUG] Cache stored successfully from Array driver.
+[2026-03-08 02:17:52] [DEBUG] Cache key: test-key exists and it's available! from array driver.
+[2026-03-08 02:17:52] [DEBUG] Cache key: test-key exists and it's available! from array driver.
+[2026-03-08 02:17:52] [DEBUG] Cache retrieved successfully from array driver.
+[2026-03-08 02:18:55] [DEBUG] Cache stored successfully from Array driver.
+[2026-03-08 02:18:55] [DEBUG] Cache key: test-key exists and it's available! from array driver.
+[2026-03-08 02:18:55] [DEBUG] Cache key: test-key exists and it's available! from array driver.
+[2026-03-08 02:18:55] [DEBUG] Cache retrieved successfully from array driver.
+[2026-03-28 15:24:18] [DEBUG] Cache stored successfully from Array driver.
+[2026-03-28 15:24:18] [DEBUG] Cache key: test-key exists and it's available! from array driver.
+[2026-03-28 15:24:18] [DEBUG] Cache key: test-key exists and it's available! from array driver.
+[2026-03-28 15:24:18] [DEBUG] Cache retrieved successfully from array driver.

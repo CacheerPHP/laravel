@@ -23,14 +23,14 @@ use Illuminate\Support\Facades\Facade;
  * @method bool forever(string $cacheKey, mixed $cacheData)
  * @method static mixed getAndForget(string $cacheKey, string $namespace = '')
  * @method mixed getAndForget(string $cacheKey, string $namespace = '')
- * @method static CacheDataFormatter|mixed getAll(string $namespace = '')
- * @method CacheDataFormatter|mixed getAll(string $namespace = '')
+ * @method static \Silviooosilva\CacheerPhp\Utils\CacheDataFormatter|mixed getAll(string $namespace = '')
+ * @method \Silviooosilva\CacheerPhp\Utils\CacheDataFormatter|mixed getAll(string $namespace = '')
  * @method static mixed getCache(string $cacheKey, string $namespace = '', int|string $ttl = 3600)
  * @method mixed getCache(string $cacheKey, string $namespace = '', int|string $ttl = 3600)
- * @method static array|CacheDataFormatter getMany(array $cacheKeys, string $namespace = '', int|string $ttl = 3600)
- * @method array|CacheDataFormatter getMany(array $cacheKeys, string $namespace = '', int|string $ttl = 3600)
- * @method static getOptions(): array
- * @method getOptions(): array
+ * @method static array|\Silviooosilva\CacheerPhp\Utils\CacheDataFormatter getMany(array $cacheKeys, string $namespace = '', int|string $ttl = 3600)
+ * @method array|\Silviooosilva\CacheerPhp\Utils\CacheDataFormatter getMany(array $cacheKeys, string $namespace = '', int|string $ttl = 3600)
+ * @method static array getOptions()
+ * @method array getOptions()
  * @method static bool has(string $cacheKey, string $namespace = '')
  * @method bool has(string $cacheKey, string $namespace = '')
  * @method static bool increment(string $cacheKey, int $amount = 1, string $namespace = '')
@@ -43,18 +43,20 @@ use Illuminate\Support\Facades\Facade;
  * @method bool tag(string $tag, string ...$keys)
  * @method static bool flushTag(string $tag)
  * @method bool flushTag(string $tag)
- * @method static mixed remember(string $cacheKey, int|string $ttl, Closure $callback)
- * @method mixed remember(string $cacheKey, int|string $ttl, Closure $callback)
- * @method static mixed rememberForever(string $cacheKey, Closure $callback)
- * @method mixed rememberForever(string $cacheKey, Closure $callback)
+ * @method static mixed remember(string $cacheKey, int|string $ttl, \Closure $callback)
+ * @method mixed remember(string $cacheKey, int|string $ttl, \Closure $callback)
+ * @method static mixed rememberForever(string $cacheKey, \Closure $callback)
+ * @method mixed rememberForever(string $cacheKey, \Closure $callback)
  * @method static bool renewCache(string $cacheKey, int|string $ttl = 3600, string $namespace = '')
  * @method bool renewCache(string $cacheKey, int|string $ttl = 3600, string $namespace = '')
- * @method static setConfig(): CacheConfig
- * @method setConfig(): CacheConfig
- * @method static setDriver(): CacheDriver
- * @method setDriver(): CacheDriver
- * @method static setUp(array $options): void
- * @method setUp(array $options): void
+ * @method static \Silviooosilva\CacheerPhp\Helpers\CacheConfig setConfig()
+ * @method \Silviooosilva\CacheerPhp\Helpers\CacheConfig setConfig()
+ * @method static \Silviooosilva\CacheerPhp\Utils\CacheDriver setDriver()
+ * @method \Silviooosilva\CacheerPhp\Utils\CacheDriver setDriver()
+ * @method static void setUp(array $options)
+ * @method void setUp(array $options)
+ * @method static array stats()
+ * @method array stats()
  *
  * @see \Silviooosilva\CacheerPhp\Cacheer
  */

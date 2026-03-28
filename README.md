@@ -52,6 +52,10 @@ php artisan vendor:publish --provider="Cacheer\\Laravel\\CacheerLaravelServicePr
 | `encryption_key` | Optional key to encrypt cached payloads. |
 | `reporter.enabled` | Toggles JSONL reporter integration. |
 | `reporter.events` | Location of the JSONL log consumed by Cacheer Monitor. |
+| `monitor.host` | Host address for the monitor dashboard (default `127.0.0.1`). |
+| `monitor.port` | Port for the monitor dashboard (default `9966`). |
+| `monitor.endpoint` | HTTP endpoint for clearing events. |
+| `monitor.timeout` | HTTP timeout in seconds for monitor API calls (default `30`). |
 
 ## Usage
 
@@ -84,7 +88,7 @@ The `composer test` script runs Rector (dry-run), Pint, PHPStan and PHPUnit.
 
 ## Documentation
 
-Contribution and upgrade notes live in the main [CacheerPHP docs](../docs/en/contributing/index.md) (Portuguese versions also available).
+Contribution and upgrade notes live in the main [CacheerPHP docs](https://github.com/silviooosilva/CacheerPHP) (Portuguese versions also available).
 
 ## License
 

@@ -15,16 +15,10 @@ class CacheerManager
     private Cacheer $instance;
 
     /**
-     * The Laravel application container instance.
-     */
-    private Application $app;
-
-    /**
      * Create a new manager.
      */
-    public function __construct(Application $app)
+    public function __construct(private Application $app)
     {
-        $this->app = $app;
         $this->instance = $this->createInstance();
     }
 
@@ -39,7 +33,7 @@ class CacheerManager
     /**
      * Forward calls to the Cacheer instance.
      */
-    public function __call(string $method, array $arguments)
+    public function __call(string $method, array $arguments): mixed
     {
         return $this->instance->{$method}(...$arguments);
     }
