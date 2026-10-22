@@ -1,4 +1,7 @@
-vendor/
-composer.lock
-.env
-.phpunit.result.cache
+/vendor/
+/composer.lock
+/.env
+/.phpunit.cache/
+/.phpunit.result.cache
+/.phpstan/
+/database/database.sqlite

@@ -1,0 +1,14 @@
+parameters:
+    level: 8
+    paths:
+        - src
+        - tests
+        - database
+    tmpDir: .phpstan
+    ignoreErrors:
+        # \Redis comes from ext-redis, which is optional (predis works too).
+        -
+            message: '#Redis#'
+            identifier: class.notFound
+            path: src/StoreFactory.php
+            reportUnmatched: false
