@@ -67,10 +67,17 @@ Keep serving while Redis is down:
 ],
 ```
 
-Reads and writes move to the fallback when Redis fails, and come back when it
-recovers. Values deleted or changed during the outage are not resurrected from
-Redis afterwards. Counters and locks never fall back: during the outage they fail
+Reads and writes move to the fallback when Redis fails, and go back to Redis when
+it recovers. Counters and locks never fall back: during the outage they fail
 closed (a lock is not acquired) rather than hand out a second, unshared lock.
+
+Failover state lives in each PHP process. A long-running process (an Octane
+worker, a queue worker) remembers the keys it changed during the outage and
+invalidates them on Redis before using it again. A process that ends does not:
+under PHP-FPM every request is its own process, so a value changed or deleted
+during an outage can be served again from Redis after it recovers, until it
+expires. If that matters, keep TTLs short for such data, or run
+`php artisan cache:clear` once Redis is back.
 
 ### Tiered caching
 
