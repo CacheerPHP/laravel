@@ -101,9 +101,6 @@ jobs:
     strategy:
       matrix:
         laravel: ['12', '13']
-    env:
-      SMOKE_APP: ${{ runner.temp }}/cacheer-consumer
-      SMOKE_ARCHIVE: ${{ runner.temp }}/cacheer-laravel.zip
     steps:
       - uses: actions/checkout@v4
 
@@ -112,6 +109,11 @@ jobs:
           php-version: '8.3'
           extensions: pdo_sqlite
           coverage: none
+
+      - name: Set smoke test paths
+        run: |
+          echo "SMOKE_APP=$RUNNER_TEMP/cacheer-consumer" >> "$GITHUB_ENV"
+          echo "SMOKE_ARCHIVE=$RUNNER_TEMP/cacheer-laravel.zip" >> "$GITHUB_ENV"
 
       - name: Install the distribution without development dependencies
         run: |
