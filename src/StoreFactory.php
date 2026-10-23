@@ -7,6 +7,7 @@ namespace Cacheer\Laravel;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Redis\RedisManager;
 use Illuminate\Support\Arr;
+use Illuminate\Support\ConfigurationUrlParser;
 use InvalidArgumentException;
 use Predis\ClientInterface;
 use Redis;
@@ -16,6 +17,8 @@ use Silviooosilva\CacheerPhp\Contracts\Clock;
 use Silviooosilva\CacheerPhp\Contracts\RedisConnection;
 use Silviooosilva\CacheerPhp\Contracts\Store;
 use Silviooosilva\CacheerPhp\Kernel\Ttl;
+use Silviooosilva\CacheerPhp\Observability\NullEventDispatcher;
+use Silviooosilva\CacheerPhp\Observability\Telemetry;
 use Silviooosilva\CacheerPhp\Storage\Encryption\Keyring;
 use Silviooosilva\CacheerPhp\Storage\EnvelopeCodec;
 use Silviooosilva\CacheerPhp\Stores\ArrayStore;
@@ -56,61 +59,36 @@ final readonly class StoreFactory
     {
         $clock = $this->clock();
         $codec = $this->pipeline($config)->codec();
-        $store = $this->backend($config, $codec, $clock);
+        $primary = $this->backend($config, $codec, $clock);
+        $store = $primary;
 
         if (isset($config['fallback'])) {
-            $store = new ResilientStore($store, $this->backend(self::fallback($config['fallback']), $codec, $clock), null, $clock);
+            // The store reports outages and fallback service through its own
+            // dispatcher, as Cacheer::resilient() wires it. CacheerPHP 6.0 has no
+            // such parameter and ignores the extra argument.
+            $store = new ResilientStore(
+                $store,
+                $this->backend(self::fallback($config['fallback']), $codec, $clock),
+                null,
+                $clock,
+                Telemetry::hasListeners() ? Telemetry::dispatcher() : new NullEventDispatcher,
+            );
         }
 
         $l1 = self::l1Seconds($config['l1'] ?? null);
         $prefix = $this->prefix($config);
 
-        if ($l1 === null) {
-            return new CacheerStore(self::scoped(new Cacheer($store, $clock), $prefix), null, $prefix);
-        }
+        $cache = $l1 === null
+            ? new Cacheer($store, $clock)
+            : Cacheer::tiered(new ArrayStore($clock), $store, Ttl::seconds($l1), $clock);
 
-        $tiered = Cacheer::tiered(new ArrayStore($clock), $store, Ttl::seconds($l1), $clock);
-
-        // Lock records bypass the in-process tier: a release must read the owner
-        // from the shared store, not from a copy another server has since replaced.
+        // Both the guard and its owner record stay on the primary. Falling back
+        // after taking the guard could otherwise grant a lock only held locally.
         return new CacheerStore(
-            self::scoped($tiered, $prefix),
-            self::scoped(new Cacheer($store, $clock), $prefix),
+            self::scoped($cache, $prefix),
+            self::scoped(new Cacheer($primary, $clock), $prefix),
             $prefix,
         );
-    }
-
-    /**
-     * Every database table the configured cacheer stores use, as
-     * [connection, table] pairs, for the published migration.
-     *
-     * @param  array<string, mixed>  $stores  The `cache.stores` configuration.
-     * @return list<array{0: string|null, 1: string}>
-     */
-    public static function databaseTables(array $stores): array
-    {
-        $tables = [];
-
-        foreach ($stores as $config) {
-            if (! is_array($config) || ($config['driver'] ?? null) !== 'cacheer') {
-                continue;
-            }
-
-            $backends = [$config];
-
-            if (isset($config['fallback'])) {
-                $backends[] = self::fallback($config['fallback']);
-            }
-
-            foreach ($backends as $backend) {
-                if (($backend['backend'] ?? 'file') === 'database') {
-                    $pair = [self::optionalString($backend, 'connection'), self::string($backend, 'table', 'cacheer_store')];
-                    $tables[implode("\0", [$pair[0] ?? '', $pair[1]])] = $pair;
-                }
-            }
-        }
-
-        return array_values($tables);
     }
 
     /**
@@ -122,26 +100,20 @@ final readonly class StoreFactory
 
         return match ($backend) {
             'array' => new ArrayStore($clock),
-            'file' => new FileStore(
+            'file' => new DeferredStore(fn (): FileStore => new FileStore(
                 self::string($config, 'path', $this->app->storagePath('framework/cache/cacheer')),
                 $codec,
                 null,
                 $clock,
-            ),
-            'database' => new DatabaseStore(
+            )),
+            'database' => new DeferredStore(fn (): DatabaseStore => new DatabaseStore(
                 $this->app->make('db')->connection(self::optionalString($config, 'connection'))->getPdo(),
                 self::string($config, 'table', 'cacheer_store'),
                 $codec,
                 null,
                 $clock,
-            ),
-            'redis' => new RedisStore(
-                $this->redis(self::string($config, 'connection', 'default')),
-                self::string($config, 'redis_prefix', 'cacheer'),
-                $codec,
-                null,
-                $clock,
-            ),
+            )),
+            'redis' => $this->redisStore($config, $codec, $clock),
             default => throw new InvalidArgumentException(sprintf(
                 'Unknown CacheerPHP backend [%s]; use one of: %s.',
                 is_scalar($backend) ? (string) $backend : get_debug_type($backend),
@@ -153,9 +125,12 @@ final readonly class StoreFactory
     /**
      * A client for one of Laravel's redis connections, built without the
      * options that rewrite keys or values on the wire.
+     *
+     * @param  array<string, mixed>  $store
      */
-    private function redis(string $name): RedisConnection
+    private function redisStore(array $store, EnvelopeCodec $codec, Clock $clock): DeferredStore
     {
+        $name = self::string($store, 'connection', 'default');
         $config = (array) $this->app->make('config')->get('database.redis', []);
         $client = (string) Arr::pull($config, 'client', 'phpredis');
 
@@ -165,11 +140,32 @@ final readonly class StoreFactory
             throw new InvalidArgumentException("Redis clusters are not supported by the CacheerPHP redis backend (connection [{$name}]).");
         }
 
-        foreach (['prefix', 'serializer', 'compression'] as $option) {
-            unset($config['options'][$option], $config[$name][$option]);
+        if (! isset($config[$name])) {
+            throw new InvalidArgumentException("Redis connection [{$name}] not configured.");
         }
 
-        $connection = (new RedisManager($this->app, $client, $config))->connection($name)->client();
+        // Parse URLs first: their query options can reintroduce a prefix or a
+        // serializer even after the surrounding array was sanitized.
+        $config[$name] = (new ConfigurationUrlParser)->parseConfiguration($config[$name]);
+
+        foreach (['prefix', 'serializer', 'compression', 'compression_level'] as $option) {
+            unset($config['options'][$option], $config[$name][$option], $config[$name]['options'][$option]);
+        }
+
+        $prefix = self::string($store, 'redis_prefix', 'cacheer');
+
+        return new DeferredStore(fn (): RedisStore => new RedisStore(
+            $this->redis(new RedisManager($this->app, $client, $config), $name),
+            $prefix,
+            $codec,
+            null,
+            $clock,
+        ));
+    }
+
+    private function redis(RedisManager $manager, string $name): RedisConnection
+    {
+        $connection = $manager->connection($name)->client();
 
         return match (true) {
             $connection instanceof ClientInterface => new PredisConnection($connection),

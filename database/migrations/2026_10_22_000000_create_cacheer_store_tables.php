@@ -2,28 +2,29 @@
 
 declare(strict_types=1);
 
-use Cacheer\Laravel\StoreFactory;
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Silviooosilva\CacheerPhp\Stores\Support\DatabaseStoreSchema;
 
 /**
- * Creates the tables of every cacheer store configured with the database
- * backend (as primary or fallback), on that store's connection.
+ * Edit this list before migrating to match your database backends, including
+ * fallbacks. Keep it fixed afterward so rollback targets the original tables.
  */
 return new class extends Migration
 {
+    /** @var list<array{0: string|null, 1: string}> */
+    private array $tables = [[null, 'cacheer_store']];
+
     public function up(): void
     {
-        foreach (StoreFactory::databaseTables((array) Config::get('cache.stores', [])) as [$connection, $table]) {
+        foreach ($this->tables as [$connection, $table]) {
             DatabaseStoreSchema::migrate(DB::connection($connection)->getPdo(), $table);
         }
     }
 
     public function down(): void
     {
-        foreach (StoreFactory::databaseTables((array) Config::get('cache.stores', [])) as [$connection, $table]) {
+        foreach (array_reverse($this->tables) as [$connection, $table]) {
             DatabaseStoreSchema::drop(DB::connection($connection)->getPdo(), $table);
         }
     }

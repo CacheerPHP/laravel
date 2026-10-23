@@ -20,6 +20,20 @@ CacheerPHP 6. It replaces the unreleased 0.1 package
 - Publishable migration for the database backend.
 - CacheerPHP's `Cache` contract is bound in the container.
 
+### Fixed
+
+- Lock guards and owner records both stay on the primary, including when a
+  backend fails between acquiring the guard and reading or writing its owner.
+  Outages fail closed without hiding programming or payload errors.
+- Backend connections are deferred until an operation runs, so an unavailable
+  primary can fall back at startup and retry connecting after recovery.
+- Redis prefix, serializer, and compression options are removed from global,
+  nested, and URL connection settings before CacheerPHP uses the connection.
+- Published migrations use explicit table definitions so changing cache store
+  configuration cannot redirect rollback to a different table.
+- Laravel stores forward failover telemetry on CacheerPHP 6.1 while remaining
+  compatible with 6.0.
+
 ### Removed
 
 - The 0.1 `Cacheer` facade, `CacheerManager`, `config/cacheer.php`, and the

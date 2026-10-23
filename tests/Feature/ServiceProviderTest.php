@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cacheer\Laravel\Tests\Feature;
 
+use Cacheer\Laravel\CacheerServiceProvider;
 use Cacheer\Laravel\CacheerStore;
 use Cacheer\Laravel\StoreFactory;
 use Cacheer\Laravel\Tests\TestCase;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Cache as CacheFacade;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Silviooosilva\CacheerPhp\Contracts\Cache;
 use Silviooosilva\CacheerPhp\Observability\CacheEvent;
@@ -70,7 +72,7 @@ final class ServiceProviderTest extends TestCase
         $this->assertSame('', $store->getPrefix());
     }
 
-    public function test_reads_and_writes_fail_over_while_the_primary_is_down_and_locks_fail_closed(): void
+    public function test_redis_reads_and_writes_fail_over_while_the_primary_is_down_and_locks_fail_closed(): void
     {
         $this->unreachableRedis();
         $cache = $this->store(['backend' => 'redis', 'connection' => 'down', 'fallback' => 'array']);
@@ -79,6 +81,23 @@ final class ServiceProviderTest extends TestCase
 
         $this->assertSame('value', $cache->get('key'));
         $this->assertFalse($this->lockStore($cache->getStore())->lock('job', 60)->get());
+    }
+
+    public function test_redis_failover_is_reported_to_telemetry(): void
+    {
+        if (! defined(CacheEventType::class.'::FallbackServed')) {
+            $this->markTestSkipped('Failover events need CacheerPHP 6.1.');
+        }
+
+        $types = [];
+        Telemetry::listen(function (CacheEvent $event) use (&$types): void {
+            $types[] = $event->type->value;
+        });
+        $this->unreachableRedis();
+
+        $this->store(['backend' => 'redis', 'connection' => 'down', 'fallback' => 'array'])->get('key');
+
+        $this->assertContains('cache.fallback_served', $types);
     }
 
     public function test_a_lock_record_is_read_from_the_shared_store_not_a_servers_local_tier(): void
@@ -137,32 +156,90 @@ final class ServiceProviderTest extends TestCase
         $this->cacheerStore(['backend' => 'redis', 'connection' => 'shared']);
     }
 
-    public function test_the_migration_creates_every_configured_database_table_once(): void
+    /** @return array<string, array{string}> */
+    public static function redisOptions(): array
+    {
+        return [
+            'global options' => ['global'],
+            'connection options' => ['connection'],
+            'nested connection options' => ['nested'],
+            'URL query options' => ['url'],
+        ];
+    }
+
+    #[DataProvider('redisOptions')]
+    public function test_redis_wire_options_do_not_change_cacheer_keys_or_values(string $location): void
+    {
+        if (getenv('CACHEER_TEST_REDIS_PORT') === false) {
+            $this->markTestSkipped('A disposable Redis server is not configured.');
+        }
+
+        $this->useRedis();
+        $options = ['prefix' => 'foreign:', 'serializer' => 1, 'compression' => 1, 'compression_level' => 1];
+
+        match ($location) {
+            'global' => Config::set('database.redis.options', $options),
+            'connection' => Config::set('database.redis.cacheer_test', (array) Config::get('database.redis.cacheer_test') + $options),
+            'nested' => Config::set('database.redis.cacheer_test.options', $options),
+            'url' => Config::set('database.redis.cacheer_test.url', sprintf(
+                'redis://%s:%d/15?%s',
+                getenv('CACHEER_TEST_REDIS_HOST') ?: '127.0.0.1',
+                (int) getenv('CACHEER_TEST_REDIS_PORT'),
+                http_build_query($options + ['options' => $options]),
+            )),
+            default => throw new InvalidArgumentException('Unknown Redis test option location.'),
+        };
+
+        $store = $this->cacheerStore([
+            'backend' => 'redis', 'connection' => 'cacheer_test',
+            'redis_prefix' => 'cacheer_laravel_options', 'prefix' => $location,
+        ]);
+        $store->put('key', ['value' => 42], 60);
+        $this->assertSame(['value' => 42], $store->get('key'));
+        $this->assertTrue($store->lock('job', 60)->get());
+        $store->lock('job')->forceRelease();
+        $store->flush();
+        $this->assertNull($store->get('key'));
+    }
+
+    public function test_the_published_migration_rolls_back_its_original_tables(): void
     {
         Config::set('cache.stores', [
             'one' => ['driver' => 'cacheer', 'backend' => 'database'],
-            'two' => ['driver' => 'cacheer', 'backend' => 'redis', 'fallback' => ['backend' => 'database', 'table' => 'cache_fallback']],
-            'same' => ['driver' => 'cacheer', 'backend' => 'database', 'table' => 'cacheer_store'],
-            'laravel' => ['driver' => 'database', 'table' => 'cache'],
         ]);
-
-        $this->assertSame(
-            [[null, 'cacheer_store'], [null, 'cache_fallback']],
-            StoreFactory::databaseTables((array) Config::get('cache.stores')),
-        );
+        $this->assertNotNull($this->app);
+        $this->app->useDatabasePath($this->directory().'/database');
+        (new CacheerServiceProvider($this->app))->boot();
+        $this->assertSame(0, Artisan::call('vendor:publish', ['--tag' => 'cacheer-migrations']));
+        $files = glob($this->app->databasePath('migrations/*_create_cacheer_store_tables.php'));
+        $this->assertIsArray($files);
+        $this->assertCount(1, $files);
 
         $this->assertSame(0, Artisan::call('migrate', [
-            '--path' => realpath(__DIR__.'/../../database/migrations'),
+            '--path' => $this->app->databasePath('migrations'),
             '--realpath' => true,
         ]));
 
         $tables = array_column(DB::select("SELECT name FROM sqlite_master WHERE type = 'table'"), 'name');
-        foreach (['cacheer_store', 'cacheer_store_locks', 'cacheer_store_tags', 'cache_fallback'] as $table) {
+        foreach (['cacheer_store', 'cacheer_store_locks', 'cacheer_store_tags'] as $table) {
             $this->assertContains($table, $tables);
         }
 
         CacheFacade::store('one')->put('key', 'value', 60);
         $this->assertSame('value', CacheFacade::store('one')->get('key'));
+
+        DB::statement('CREATE TABLE unrelated (id INTEGER)');
+        DB::statement('INSERT INTO unrelated (id) VALUES (42)');
+        Config::set('cache.stores.one.table', 'unrelated');
+        $this->assertSame(0, Artisan::call('migrate:rollback', [
+            '--path' => $this->app->databasePath('migrations'),
+            '--realpath' => true,
+        ]));
+        $this->assertSame(42, (int) DB::selectOne('SELECT id FROM unrelated')->id);
+        $tables = array_column(DB::select("SELECT name FROM sqlite_master WHERE type = 'table'"), 'name');
+        foreach (['cacheer_store', 'cacheer_store_locks', 'cacheer_store_tags'] as $table) {
+            $this->assertNotContains($table, $tables);
+        }
     }
 
     public function test_cache_operations_reach_cacheerphp_telemetry(): void
@@ -199,7 +276,7 @@ final class ServiceProviderTest extends TestCase
 
     private function unreachableRedis(): void
     {
-        Config::set('database.redis.client', 'predis');
+        Config::set('database.redis.client', getenv('CACHEER_TEST_REDIS_CLIENT') ?: 'predis');
         Config::set('database.redis.down', ['host' => '127.0.0.1', 'port' => 1, 'timeout' => 0.2]);
     }
 

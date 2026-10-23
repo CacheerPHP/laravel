@@ -35,6 +35,16 @@ it the default:
 ],
 ```
 
+Set `CACHE_STORE=cacheer` in your application's `.env`. An existing value such
+as `CACHE_STORE=database` takes precedence over the default above. Then refresh
+the configuration:
+
+```bash
+php artisan config:clear
+# On deployments that cache configuration:
+php artisan config:cache
+```
+
 ## Configuration
 
 ### Backends
@@ -46,13 +56,27 @@ it the default:
 | `database` | A Laravel database connection | `connection`, `table` (default `cacheer_store`) |
 | `redis` | A Laravel redis connection | `connection` (default `default`), `redis_prefix` (default `cacheer`) |
 
-For the database backend, publish and run the migration. It creates the tables of
-every `cacheer` store that uses the database, as primary or fallback:
+For the database backend, publish the migration:
 
 ```bash
 php artisan vendor:publish --tag=cacheer-migrations
-php artisan migrate
 ```
+
+Before running it, edit the published migration's `$tables` list to match your
+database backends, including fallbacks. The default is `[[null, 'cacheer_store']]`
+on Laravel's default database connection. For example, two distinct tables on a
+named connection use:
+
+```php
+private array $tables = [
+    ['mysql', 'cacheer_store'],
+    ['mysql', 'cacheer_fallback'],
+];
+```
+
+List each connection/table pair once, then run `php artisan migrate`. Keep the
+list fixed afterward so rollback reverses the original migration even when
+`config/cache.php` changes. Use a new migration when adding a database backend.
 
 ### Failover
 
@@ -134,7 +158,9 @@ $this->cache->flushTag('catalog');
 ## Monitoring
 
 Install [Cacheer Monitor](https://github.com/CacheerPHP/monitor) and every cacheer
-store reports to it, with no further setup.
+store reports to it, with no further setup. Failover events require CacheerPHP
+6.1 and a Monitor version that understands those events; ordinary cache events
+also work with CacheerPHP 6.0.
 
 ## Testing
 
@@ -160,7 +186,7 @@ the test.
   from the Laravel connection's settings, ignoring Laravel's redis `prefix`,
   `serializer` and `compression` options, because CacheerPHP prefixes and
   serializes on its own.
-- **Database connections are captured when the store is created.** In
+- **Database connections are captured on first use.** In
   long-running workers, a connection that Laravel later reconnects is not
   followed; restart workers after a database failover.
 
@@ -184,8 +210,12 @@ composer install
 composer test
 ```
 
-`composer test` runs Rector (dry run), Pint, PHPStan and PHPUnit. To include the
-Redis tests, point them at a disposable server; they use database 15:
+`composer test` validates Composer metadata and runs Rector (dry run), Pint,
+PHPStan and PHPUnit. CI also checks lower dependency bounds and installs the
+distribution ZIP into clean Laravel 12 and 13 applications without development
+dependencies, exercising discovery, cached configuration, and migrations.
+To include the Redis tests, point them at a disposable server; they use database
+15:
 
 ```bash
 CACHEER_TEST_REDIS_PORT=6379 vendor/bin/phpunit
