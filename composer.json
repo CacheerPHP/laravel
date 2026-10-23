@@ -3,7 +3,14 @@
   "description": "A Laravel cache driver backed by CacheerPHP: keep using Cache:: and get CacheerPHP's stores, failover, encryption and monitoring underneath.",
   "keywords": ["cacheer", "cacheerphp", "laravel", "cache", "cache-driver", "failover", "tiered-cache"],
   "type": "library",
+  "homepage": "https://cacheerphp.com",
   "license": "MIT",
+  "support": {
+    "issues": "https://github.com/CacheerPHP/cacheerphp-laravel/issues",
+    "source": "https://github.com/CacheerPHP/cacheerphp-laravel",
+    "docs": "https://github.com/CacheerPHP/cacheerphp-laravel#readme",
+    "security": "https://github.com/CacheerPHP/cacheerphp-laravel/security/policy"
+  },
   "authors": [
     {
       "name": "Silvio Silva",
@@ -47,13 +54,28 @@
       ]
     }
   },
+  "archive": {
+    "exclude": [
+      "/.*",
+      "/vendor",
+      "/tests",
+      "/composer.lock",
+      "/phpstan.neon.dist",
+      "/phpunit.xml",
+      "/rector.php",
+      "/cacheer.log",
+      "/database/*.sqlite"
+    ]
+  },
   "scripts": {
     "test": [
+      "@test:composer",
       "@test:refactor",
       "@test:lint",
       "@test:types",
       "@test:unit"
     ],
+    "test:composer": "@composer validate --strict",
     "test:refactor": "rector process --dry-run",
     "test:lint": "pint --test",
     "test:types": "phpstan analyse",

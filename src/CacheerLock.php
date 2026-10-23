@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Cacheer\Laravel;
 
 use Illuminate\Cache\Lock;
+use LogicException;
 use Silviooosilva\CacheerPhp\Contracts\Cache;
+use Silviooosilva\CacheerPhp\Exceptions\CacheException;
+use Silviooosilva\CacheerPhp\Exceptions\StoreOperationFailedException;
+use Throwable;
 
 /**
  * A Laravel atomic lock whose owner is stored as data in a CacheerPHP cache.
@@ -18,8 +22,8 @@ use Silviooosilva\CacheerPhp\Contracts\Cache;
  * atomic on any store that can lock, and keeps release owner-scoped: an expired
  * holder can never delete the lock someone else acquired after it.
  *
- * When the guard cannot be taken (contention past five seconds, or a resilient
- * store whose primary is down) the operation fails closed and returns false.
+ * The cache supplied here must address the primary, without fallback or L1.
+ * Backend outages at any step fail closed; programming and payload errors surface.
  */
 final class CacheerLock extends Lock
 {
@@ -62,7 +66,7 @@ final class CacheerLock extends Lock
      */
     public function forceRelease(): void
     {
-        $this->locks->delete($this->name);
+        $this->guarded(fn (): bool => $this->locks->delete($this->name));
     }
 
     /**
@@ -87,7 +91,13 @@ final class CacheerLock extends Lock
 
     protected function getCurrentOwner(): ?string
     {
-        $owner = $this->locks->get($this->name);
+        try {
+            $owner = $this->locks->get($this->name);
+        } catch (Throwable $error) {
+            self::rethrowUnlessOutage($error);
+
+            return null;
+        }
 
         return is_string($owner) ? $owner : null;
     }
@@ -108,16 +118,40 @@ final class CacheerLock extends Lock
      */
     private function guarded(callable $operation): bool
     {
-        $guard = $this->locks->lock('guard:'.$this->name, self::GUARD_TTL_SECONDS);
+        try {
+            $guard = $this->locks->lock('guard:'.$this->name, self::GUARD_TTL_SECONDS);
 
-        if (! $guard->block(self::GUARD_WAIT_SECONDS)) {
+            if (! $guard->block(self::GUARD_WAIT_SECONDS)) {
+                return false;
+            }
+
+            try {
+                return $operation();
+            } finally {
+                try {
+                    $guard->release();
+                } catch (Throwable $error) {
+                    self::rethrowUnlessOutage($error);
+                }
+            }
+        } catch (Throwable $error) {
+            self::rethrowUnlessOutage($error);
+
             return false;
         }
+    }
 
-        try {
-            return $operation();
-        } finally {
-            $guard->release();
+    private static function rethrowUnlessOutage(Throwable $error): void
+    {
+        // Match core's outage boundary without depending on its internal helper.
+        $cause = $error;
+
+        while ($cause instanceof StoreOperationFailedException && $cause->getPrevious() !== null) {
+            $cause = $cause->getPrevious();
+        }
+
+        if ($cause instanceof \Error || $cause instanceof LogicException || $cause instanceof CacheException) {
+            throw $error;
         }
     }
 }

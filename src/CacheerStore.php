@@ -28,10 +28,9 @@ final readonly class CacheerStore implements LockProvider, Store
 
     /**
      * @param  Cache  $cache  The cache values are read from and written to.
-     * @param  Cache|null  $lockCache  Where lock records live, when that must differ
-     *                                 from $cache: lock ownership is read on every
-     *                                 release, so it must come from the shared store,
-     *                                 never from a tiered cache's local copy.
+     * @param  Cache|null  $lockCache  The primary cache, without fallback or L1.
+     *                                 Both the guard and the owner record must use
+     *                                 the shared primary throughout an operation.
      * @param  string  $prefix  Reported by {@see self::getPrefix()}; the isolation it
      *                          stands for is already the scope of $cache.
      */
