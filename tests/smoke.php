@@ -52,8 +52,8 @@ if ($store->get('smoke') !== null) {
     throw new RuntimeException('Cache flush did not remove the value.');
 }
 
-// Laravel's own stores run through CacheerPHP, which needs a core release with
-// entries of unknown age.
+// Laravel's own stores run through CacheerPHP, which needs entries of unknown
+// age (CacheerPHP 6.1.1).
 $native = Cache::store('native');
 
 if (! $native->getStore() instanceof RoutedStore) {
