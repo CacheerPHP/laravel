@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Cacheer\Laravel;
 
+use Cacheer\Laravel\Console\DoctorCommand;
+use Cacheer\Laravel\Routing\CacheerCacheManager;
 use Illuminate\Cache\CacheManager;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Foundation\Application;
@@ -12,20 +14,32 @@ use RuntimeException;
 use Silviooosilva\CacheerPhp\Contracts\Cache;
 
 /**
- * Registers the `cacheer` cache driver, and binds CacheerPHP's {@see Cache}
- * contract to the cache behind the application's cacheer store.
+ * Routes the application's cache stores through CacheerPHP, registers the
+ * `cacheer` cache driver, and binds CacheerPHP's {@see Cache} contract to the
+ * cache behind the application's cacheer store.
  */
 final class CacheerServiceProvider extends ServiceProvider
 {
     /**
-     * Register the `cacheer` driver and the CacheerPHP `Cache` binding.
+     * Route the cache stores, and register the `cacheer` driver and the
+     * CacheerPHP `Cache` binding.
      */
     #[\Override]
     public function register(): void
     {
         $this->app->singleton(StoreFactory::class, fn (Application $app): StoreFactory => new StoreFactory($app));
 
-        $this->callAfterResolving('cache', function (CacheManager $manager): void {
+        // Laravel's cache provider is deferred, so the manager is replaced as
+        // it is built rather than bound here, where the deferred provider would
+        // overwrite it.
+        $this->app->extend('cache', fn (mixed $manager, Application $app): mixed => CacheerCacheManager::replacing($manager, $app));
+
+        $this->callAfterResolving('cache', function (mixed $manager): void {
+            // Another package may bind `cache` to something else entirely.
+            if (! $manager instanceof CacheManager) {
+                return;
+            }
+
             // Not static: Laravel rebinds driver creators to the cache manager.
             $manager->extend('cacheer', function (Application $app, array $config) use ($manager) {
                 /** @var array<string, mixed> $config */
@@ -45,13 +59,18 @@ final class CacheerServiceProvider extends ServiceProvider
     }
 
     /**
-     * Offer the database backend's migration for publishing.
+     * Offer the database backend's migration for publishing, and register
+     * `cacheer:doctor`.
      */
     public function boot(): void
     {
         $this->publishesMigrations([
             __DIR__.'/../database/migrations' => $this->app->databasePath('migrations'),
         ], 'cacheer-migrations');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([DoctorCommand::class]);
+        }
     }
 
     /**
