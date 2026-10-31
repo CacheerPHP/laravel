@@ -1,12 +1,14 @@
 # Changelog
 
-## 1.0.0 — Unreleased
+## 1.0.1 — 2026-10-31
 
 First release as `cacheerphp/laravel`: CacheerPHP underneath Laravel's cache,
 either beneath the stores an application already has, with the same results and
 no configuration change, or as a `cacheer` driver on CacheerPHP's own stores.
 It requires CacheerPHP 6.1.1 and replaces the unreleased 0.1 package
 (`silviooosilva/cacheerphp-laravel`); see "Upgrading from 0.1" in the README.
+Version 1.0.0 was published to Packagist from an earlier commit and
+withdrawn, so this is the first release.
 
 ### Added
 
