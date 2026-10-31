@@ -19,3 +19,8 @@ parameters:
             identifier: arguments.count
             path: src/StoreFactory.php
             reportUnmatched: false
+        # A custom store returning what Laravel's untyped contract allows but its
+        # PHPDoc does not, to test that routing passes those results through.
+        -
+            identifier: method.childReturnType
+            path: tests/Support/LooselyTypedStore.php

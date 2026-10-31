@@ -2,12 +2,29 @@
 
 ## 1.0.0 — Unreleased
 
-First release as `cacheerphp/laravel`: a Laravel cache driver backed by
-CacheerPHP 6. It replaces the unreleased 0.1 package
+First release as `cacheerphp/laravel`: CacheerPHP underneath Laravel's cache,
+either beneath the stores an application already has, with the same results and
+no configuration change, or as a `cacheer` driver on CacheerPHP's own stores.
+It requires CacheerPHP 6.1 and replaces the unreleased 0.1 package
 (`silviooosilva/cacheerphp-laravel`); see "Upgrading from 0.1" in the README.
+The design is in `docs/rfcs/001-run-on-top-of-laravel-cache.md`.
 
 ### Added
 
+- Laravel's own stores run through CacheerPHP. Reads and writes go through its
+  engine in the store's native format, under the same keys, so existing
+  entries stay readable and removing the package needs no flush. `add()`,
+  counters, `touch()`, locks, and tags go straight to the native store and
+  return its own results. Reads, writes, `add()`, counters, and `touch()` are
+  reported to CacheerPHP telemetry and Cacheer Monitor.
+- Stores the router cannot mirror exactly stay native: the `cacheer` driver,
+  `array`, `null`, `failover`, `memo`, DynamoDB, Redis with a phpredis
+  serializer or compression, and stores without `add()` or locks. Turn routing
+  off for a store with `'cacheer' => false`, or for all with
+  `cache.cacheer.route`. Code that checks `Cache::getStore()` against a
+  concrete Laravel store class sees a routed store; its `native()` method
+  returns the original.
+- `php artisan cacheer:doctor` lists each store and whether it is routed.
 - `cacheer` cache driver for Laravel 12 and 13, so `Cache::`, rate limiters,
   unique jobs, the scheduler, and isolatable commands run on CacheerPHP.
 - Backends: `array`, `file`, `database`, and `redis`, configured in

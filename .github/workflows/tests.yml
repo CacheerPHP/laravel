@@ -13,7 +13,7 @@ jobs:
       matrix:
         php: ['8.3', '8.4', '8.5']
         laravel: ['12', '13']
-        core: ['^6.0']
+        core: ['^6.1']
         dependencies: ['highest']
         include:
           - laravel: '12'
@@ -23,17 +23,17 @@ jobs:
           - php: '8.3'
             laravel: '12'
             testbench: '^10.0'
-            core: '6.0.*'
+            core: '6.1.*'
             dependencies: 'lowest'
           - php: '8.3'
             laravel: '13'
             testbench: '^11.0'
-            core: '6.0.*'
+            core: '6.1.*'
             dependencies: 'lowest'
           - php: '8.5'
             laravel: '13'
             testbench: '^11.0'
-            core: '6.0.*'
+            core: '6.1.*'
             dependencies: 'highest'
           # CacheerPHP's 6.x branch, so the next minor is tested before it is tagged.
           - php: '8.3'
