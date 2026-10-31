@@ -7,7 +7,6 @@ either beneath the stores an application already has, with the same results and
 no configuration change, or as a `cacheer` driver on CacheerPHP's own stores.
 It requires CacheerPHP 6.1.1 and replaces the unreleased 0.1 package
 (`silviooosilva/cacheerphp-laravel`); see "Upgrading from 0.1" in the README.
-The design is in `docs/rfcs/001-run-on-top-of-laravel-cache.md`.
 
 ### Added
 
