@@ -37,6 +37,10 @@ return [
             'driver' => 'cacheer',
             'backend' => env('CACHEER_SMOKE_BACKEND', 'file'),
         ],
+        'native' => [
+            'driver' => 'file',
+            'path' => storage_path('framework/cache/native'),
+        ],
     ],
 ];
 

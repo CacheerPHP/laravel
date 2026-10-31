@@ -77,8 +77,7 @@ final readonly class StoreFactory
 
         if (isset($config['fallback'])) {
             // The store reports outages and fallback service through its own
-            // dispatcher, as Cacheer::resilient() wires it. CacheerPHP 6.0 has no
-            // such parameter and ignores the extra argument.
+            // dispatcher, as Cacheer::resilient() wires it.
             $store = new ResilientStore(
                 $store,
                 $this->backend(self::fallback($config['fallback']), $codec, $clock),

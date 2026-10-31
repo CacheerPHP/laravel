@@ -48,8 +48,7 @@ The design is in `docs/rfcs/001-run-on-top-of-laravel-cache.md`.
   nested, and URL connection settings before CacheerPHP uses the connection.
 - Published migrations use explicit table definitions so changing cache store
   configuration cannot redirect rollback to a different table.
-- Laravel stores forward failover telemetry on CacheerPHP 6.1 while remaining
-  compatible with 6.0.
+- Laravel stores forward failover telemetry to CacheerPHP.
 - `Cache::flush()` and `php artisan cache:clear` no longer release held locks:
   lock records live beside the store's keyspace instead of inside it. With an
   empty prefix, flushing still clears the whole backend, locks included.

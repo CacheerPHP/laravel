@@ -12,13 +12,6 @@ parameters:
             identifier: class.notFound
             path: src/StoreFactory.php
             reportUnmatched: false
-        # ResilientStore takes an event dispatcher from CacheerPHP 6.1; 6.0 ignores
-        # the extra argument, so one call serves both versions.
-        -
-            message: '#ResilientStore constructor invoked with 5 parameters#'
-            identifier: arguments.count
-            path: src/StoreFactory.php
-            reportUnmatched: false
         # A custom store returning what Laravel's untyped contract allows but its
         # PHPDoc does not, to test that routing passes those results through.
         -
