@@ -35,6 +35,17 @@ jobs:
             testbench: '^11.0'
             core: '6.0.*'
             dependencies: 'highest'
+          # CacheerPHP's 6.x branch, so the next minor is tested before it is tagged.
+          - php: '8.3'
+            laravel: '12'
+            testbench: '^10.0'
+            core: '6.x-dev'
+            dependencies: 'highest'
+          - php: '8.5'
+            laravel: '13'
+            testbench: '^11.0'
+            core: '6.x-dev'
+            dependencies: 'highest'
 
     services:
       redis:
