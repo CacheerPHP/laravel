@@ -72,6 +72,9 @@ final class CacheerStoreTest extends TestCase
     #[DataProvider('backends')]
     public function test_entries_expire_on_laravels_clock(array $backend): void
     {
+        // Until travel() runs, the clock is real: a second ticking between put()
+        // and travel(59) would land exactly on the 60-second expiry.
+        $this->freezeTime();
         $cache = $this->store($backend);
         $cache->put('short', 'value', 60);
         $cache->forever('long', 'value');
