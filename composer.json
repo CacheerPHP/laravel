@@ -6,10 +6,10 @@
   "homepage": "https://cacheerphp.com",
   "license": "MIT",
   "support": {
-    "issues": "https://github.com/CacheerPHP/cacheerphp-laravel/issues",
-    "source": "https://github.com/CacheerPHP/cacheerphp-laravel",
-    "docs": "https://github.com/CacheerPHP/cacheerphp-laravel#readme",
-    "security": "https://github.com/CacheerPHP/cacheerphp-laravel/security/policy"
+    "issues": "https://github.com/CacheerPHP/laravel/issues",
+    "source": "https://github.com/CacheerPHP/laravel",
+    "docs": "https://github.com/CacheerPHP/laravel#readme",
+    "security": "https://github.com/CacheerPHP/laravel/security/policy"
   },
   "authors": [
     {
