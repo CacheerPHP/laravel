@@ -6,6 +6,8 @@ namespace Cacheer\Laravel\Tests\Feature;
 
 use Cacheer\Laravel\CacheerServiceProvider;
 use Cacheer\Laravel\CacheerStore;
+use Cacheer\Laravel\LaravelClock;
+use Cacheer\Laravel\PruningArrayStore;
 use Cacheer\Laravel\StoreFactory;
 use Cacheer\Laravel\Tests\TestCase;
 use Illuminate\Support\Facades\Artisan;
@@ -16,15 +18,22 @@ use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Silviooosilva\CacheerPhp\Contracts\Cache;
+use Silviooosilva\CacheerPhp\Exceptions\ValueTooLargeException;
+use Silviooosilva\CacheerPhp\Kernel\Key;
+use Silviooosilva\CacheerPhp\Kernel\Ttl;
 use Silviooosilva\CacheerPhp\Observability\CacheEvent;
 use Silviooosilva\CacheerPhp\Observability\CacheEventType;
 use Silviooosilva\CacheerPhp\Observability\Telemetry;
+use Silviooosilva\CacheerPhp\Stores\ArrayStore;
 
 /**
  * How the provider and factory turn `config/cache.php` into a CacheerPHP cache.
  */
 final class ServiceProviderTest extends TestCase
 {
+    /**
+     * Remove telemetry listeners added by the test.
+     */
     protected function tearDown(): void
     {
         Telemetry::reset();
@@ -136,6 +145,98 @@ final class ServiceProviderTest extends TestCase
         $this->expectExceptionMessage('passphrase [v1] is empty');
 
         $this->cacheerStore(['backend' => 'array', 'encryption' => ['active' => 'v1', 'passphrases' => ['v1' => null]]]);
+    }
+
+    public function test_numeric_options_accept_environment_strings(): void
+    {
+        $store = $this->cacheerStore([
+            'backend' => 'file',
+            'path' => $this->directory().'/numeric',
+            'l1' => '60',
+            'compress' => '6',
+            'max_value_bytes' => '64',
+        ]);
+
+        $this->assertTrue($store->put('small', 'value', 60));
+        $this->assertSame('value', $store->get('small'));
+
+        $this->expectException(ValueTooLargeException::class);
+        $store->put('large', str_repeat('x', 1000), 60);
+    }
+
+    /** @return array<string, array{string, mixed}> */
+    public static function disabledOptions(): array
+    {
+        return [
+            'l1 zero' => ['l1', '0'],
+            'l1 unset variable' => ['l1', ''],
+            'compress zero' => ['compress', '0'],
+            'compress false' => ['compress', false],
+            'max_value_bytes zero' => ['max_value_bytes', '0'],
+        ];
+    }
+
+    #[DataProvider('disabledOptions')]
+    public function test_numeric_options_can_be_switched_off(string $option, mixed $value): void
+    {
+        $store = $this->cacheerStore(['backend' => 'array', $option => $value]);
+
+        $this->assertTrue($store->put('key', 'value', 60));
+        $this->assertSame('value', $store->get('key'));
+    }
+
+    /** @return array<string, array{string, mixed}> */
+    public static function invalidOptions(): array
+    {
+        return [
+            'l1 word' => ['l1', 'sixty'],
+            'l1 negative' => ['l1', -5],
+            'l1 fraction' => ['l1', '1.5'],
+            'compress above 9' => ['compress', 10],
+            'compress word' => ['compress', 'max'],
+            'max_value_bytes word' => ['max_value_bytes', 'abc'],
+            'max_value_bytes negative' => ['max_value_bytes', '-1'],
+        ];
+    }
+
+    #[DataProvider('invalidOptions')]
+    public function test_invalid_numeric_options_are_refused_by_name(string $option, mixed $value): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("CacheerPHP {$option} is");
+
+        $this->cacheerStore(['backend' => 'array', $option => $value]);
+    }
+
+    public function test_a_prefix_that_cannot_be_a_scope_is_refused_by_name(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('The cache prefix [acme/app]');
+
+        $this->cacheerStore(['backend' => 'array', 'prefix' => 'acme/app']);
+    }
+
+    public function test_in_process_copies_are_swept_once_they_expire(): void
+    {
+        $clock = new LaravelClock;
+        $entries = new ArrayStore($clock);
+        $store = new PruningArrayStore($entries, $clock);
+        $fill = function () use ($store): void {
+            foreach (range(1, 100) as $i) {
+                $store->set(Key::named("key{$i}"), 'value', Ttl::seconds(1));
+            }
+        };
+
+        // Sweeping runs at most once a minute, not on every operation.
+        $fill();
+        $this->travel(2)->seconds();
+        $store->get(Key::named('other'));
+        $this->assertSame(100, $entries->prune());
+
+        $fill();
+        $this->travel(61)->seconds();
+        $store->get(Key::named('other'));
+        $this->assertSame(0, $entries->prune());
     }
 
     public function test_an_unknown_backend_is_refused(): void
@@ -257,7 +358,10 @@ final class ServiceProviderTest extends TestCase
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * Build a store straight from the factory.
+     *
+     * @param  array<string, mixed>  $config  The store's options.
+     * @return CacheerStore The store.
      */
     private function cacheerStore(array $config): CacheerStore
     {
@@ -267,6 +371,12 @@ final class ServiceProviderTest extends TestCase
         return $factory->make($config);
     }
 
+    /**
+     * Assert that a store is a cacheer store.
+     *
+     * @param  mixed  $store  The store.
+     * @return CacheerStore The same store.
+     */
     private function lockStore(mixed $store): CacheerStore
     {
         $this->assertInstanceOf(CacheerStore::class, $store);
@@ -274,12 +384,21 @@ final class ServiceProviderTest extends TestCase
         return $store;
     }
 
+    /**
+     * Configure a `down` redis connection that nothing listens on.
+     */
     private function unreachableRedis(): void
     {
         Config::set('database.redis.client', getenv('CACHEER_TEST_REDIS_CLIENT') ?: 'predis');
         Config::set('database.redis.down', ['host' => '127.0.0.1', 'port' => 1, 'timeout' => 0.2]);
     }
 
+    /**
+     * Concatenate every file under a directory.
+     *
+     * @param  string  $directory  The directory.
+     * @return string The files' contents.
+     */
     private function filesUnder(string $directory): string
     {
         $contents = '';

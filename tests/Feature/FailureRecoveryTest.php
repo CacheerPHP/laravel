@@ -8,6 +8,8 @@ use Cacheer\Laravel\StoreFactory;
 use Cacheer\Laravel\Tests\Support\FailingPdo;
 use Cacheer\Laravel\Tests\TestCase;
 use Error;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use PDOException;
@@ -17,6 +19,9 @@ use Silviooosilva\CacheerPhp\Exceptions\CorruptedPayloadException;
 use Silviooosilva\CacheerPhp\Stores\Support\DatabaseStoreSchema;
 use Throwable;
 
+/**
+ * How a cacheer store behaves when a backend fails, recovers, or reconnects.
+ */
 final class FailureRecoveryTest extends TestCase
 {
     /** @return array<string, array{string}> */
@@ -125,6 +130,43 @@ final class FailureRecoveryTest extends TestCase
         $this->assertSame(1, (int) $rows->fetchColumn());
     }
 
+    public function test_a_database_backend_follows_laravel_reconnects(): void
+    {
+        $dropped = $this->database();
+        $factory = $this->app?->make(StoreFactory::class);
+        $this->assertInstanceOf(StoreFactory::class, $factory);
+        $store = $factory->make(['backend' => 'database']);
+        $this->assertTrue($store->put('before', 'value', 60));
+
+        // The server drops the connection, and Laravel reconnects with a new PDO.
+        $dropped->down = true;
+        $current = $this->database();
+
+        $this->assertTrue($store->put('after', 'value', 60));
+        $this->assertSame('value', $store->get('after'));
+        $rows = $current->query('SELECT COUNT(*) FROM cacheer_store');
+        $this->assertInstanceOf(PDOStatement::class, $rows);
+        $this->assertSame(1, (int) $rows->fetchColumn());
+    }
+
+    public function test_a_database_backend_reconnects_after_laravel_disconnects(): void
+    {
+        $path = $this->directory().'/cache.sqlite';
+        (new Filesystem)->ensureDirectoryExists(dirname($path));
+        touch($path);
+        Config::set('database.connections.cache_file', ['driver' => 'sqlite', 'database' => $path, 'prefix' => '']);
+        DatabaseStoreSchema::migrate(DB::connection('cache_file')->getPdo(), 'cacheer_store');
+        $factory = $this->app?->make(StoreFactory::class);
+        $this->assertInstanceOf(StoreFactory::class, $factory);
+        $store = $factory->make(['backend' => 'database', 'connection' => 'cache_file']);
+
+        DB::disconnect('cache_file');
+        $this->assertTrue($store->put('key', 'value', 60));
+
+        DB::disconnect('cache_file');
+        $this->assertSame('value', $store->get('key'));
+    }
+
     public function test_an_offline_database_fallback_does_not_prevent_primary_writes(): void
     {
         DB::connection()->setPdo(fn () => throw new PDOException('Fallback is offline.'));
@@ -136,6 +178,11 @@ final class FailureRecoveryTest extends TestCase
         $this->assertSame('primary', $store->get('key'));
     }
 
+    /**
+     * Give the default connection a migrated database that can be made to fail.
+     *
+     * @return FailingPdo The database.
+     */
     private function database(): FailingPdo
     {
         $pdo = new FailingPdo;

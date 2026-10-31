@@ -32,16 +32,23 @@ final class CacheerLock extends Lock
     private const int GUARD_TTL_SECONDS = 10;
 
     /**
+     * Create a lock over a keyspace of lock records.
+     *
      * @param  Cache  $locks  The keyspace holding lock records.
-     * @param  string  $name
+     * @param  string  $name  The lock name.
      * @param  int  $seconds  Zero holds the lock until it is released.
-     * @param  string|null  $owner
+     * @param  string|null  $owner  The owner token, or null for a new one.
      */
     public function __construct(private readonly Cache $locks, $name, $seconds, $owner = null)
     {
         parent::__construct($name, $seconds, $owner);
     }
 
+    /**
+     * Take the lock if no one holds it.
+     *
+     * @return bool Whether the lock was taken.
+     */
     public function acquire(): bool
     {
         return $this->guarded(function (): bool {
@@ -55,6 +62,11 @@ final class CacheerLock extends Lock
         });
     }
 
+    /**
+     * Release the lock if this owner holds it.
+     *
+     * @return bool Whether the lock was released.
+     */
     public function release(): bool
     {
         return $this->guarded(fn (): bool => $this->isOwnedByCurrentProcess() && $this->locks->delete($this->name));
@@ -73,6 +85,10 @@ final class CacheerLock extends Lock
      * Restart the lock's lifetime, if this owner still holds it.
      *
      * @param  int|null  $seconds  Defaults to the lifetime the lock was created with.
+     *                             Without one, the lock keeps its current lifetime: a
+     *                             restored lock does not know the lifetime its holder
+     *                             gave it, and must not become permanent.
+     * @return bool Whether this owner still holds the lock.
      */
     public function refresh($seconds = null): bool
     {
@@ -83,12 +99,19 @@ final class CacheerLock extends Lock
                 return false;
             }
 
-            $this->write($seconds);
+            if ($seconds > 0) {
+                $this->write($seconds);
+            }
 
             return true;
         });
     }
 
+    /**
+     * The owner recorded for the lock.
+     *
+     * @return string|null The owner, or null when the lock is free or the backend is down.
+     */
     protected function getCurrentOwner(): ?string
     {
         try {
@@ -102,6 +125,11 @@ final class CacheerLock extends Lock
         return is_string($owner) ? $owner : null;
     }
 
+    /**
+     * Record this owner as the holder.
+     *
+     * @param  int  $seconds  The lifetime; zero never expires.
+     */
     private function write(int $seconds): void
     {
         if ($seconds > 0) {
@@ -114,7 +142,10 @@ final class CacheerLock extends Lock
     }
 
     /**
-     * @param  callable(): bool  $operation
+     * Run a check-and-write on the lock record under a short CacheerPHP lock.
+     *
+     * @param  callable(): bool  $operation  The check-and-write.
+     * @return bool Its result, or false when the guard or the backend is unavailable.
      */
     private function guarded(callable $operation): bool
     {
@@ -141,6 +172,11 @@ final class CacheerLock extends Lock
         }
     }
 
+    /**
+     * Rethrow an error unless it is a backend outage.
+     *
+     * @param  Throwable  $error  The error caught.
+     */
     private static function rethrowUnlessOutage(Throwable $error): void
     {
         // Match core's outage boundary without depending on its internal helper.

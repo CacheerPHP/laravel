@@ -18,11 +18,19 @@ final class FailingPdo extends PDO
 
     public ?Throwable $failure = null;
 
+    /**
+     * Open an in-memory SQLite database.
+     */
     public function __construct()
     {
         parent::__construct('sqlite::memory:');
     }
 
+    /**
+     * This connection, unless the database is down.
+     *
+     * @return self The connection.
+     */
     public function availableConnection(): self
     {
         if ($this->down) {
@@ -32,7 +40,14 @@ final class FailingPdo extends PDO
         return $this;
     }
 
-    /** @param array<mixed> $options */
+    /**
+     * Prepare a statement, failing while the database is down or once the
+     * query matches {@see self::$failOnSql}.
+     *
+     * @param  string  $query  The SQL.
+     * @param  array<mixed>  $options  The driver options.
+     * @return PDOStatement|false The statement.
+     */
     #[\Override]
     public function prepare(string $query, array $options = []): PDOStatement|false
     {

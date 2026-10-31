@@ -33,6 +33,19 @@ CacheerPHP 6. It replaces the unreleased 0.1 package
   configuration cannot redirect rollback to a different table.
 - Laravel stores forward failover telemetry on CacheerPHP 6.1 while remaining
   compatible with 6.0.
+- `Cache::flush()` and `php artisan cache:clear` no longer release held locks:
+  lock records live beside the store's keyspace instead of inside it. With an
+  empty prefix, flushing still clears the whole backend, locks included.
+- `Cache::putMany()` and `setMultiple()` accept numeric keys.
+- The database backend follows Laravel's reconnects and disconnects instead of
+  keeping the first PDO until the worker restarts.
+- The `l1` tier and the `array` backend sweep out expired entries, so
+  long-running workers no longer keep every key they ever held.
+- Refreshing a restored lock without a lifetime keeps its current lifetime
+  instead of making it permanent.
+- `l1`, `compress`, and `max_value_bytes` accept numeric strings from `env()`,
+  and `0` or an unset variable switches them off. Invalid values, and a prefix
+  that cannot be a CacheerPHP scope, are refused with the option named.
 
 ### Removed
 

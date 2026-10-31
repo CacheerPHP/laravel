@@ -12,9 +12,16 @@ use Silviooosilva\CacheerPhp\Stores\Support\DatabaseStoreSchema;
  */
 return new class extends Migration
 {
-    /** @var list<array{0: string|null, 1: string}> */
+    /**
+     * The connection (null for the default) and table of each database backend.
+     *
+     * @var list<array{0: string|null, 1: string}>
+     */
     private array $tables = [[null, 'cacheer_store']];
 
+    /**
+     * Create the tables of each listed backend.
+     */
     public function up(): void
     {
         foreach ($this->tables as [$connection, $table]) {
@@ -22,6 +29,9 @@ return new class extends Migration
         }
     }
 
+    /**
+     * Drop the tables of each listed backend.
+     */
     public function down(): void
     {
         foreach (array_reverse($this->tables) as [$connection, $table]) {

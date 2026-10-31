@@ -56,6 +56,20 @@ final class CacheerStoreTest extends TestCase
      * @param  array<string, mixed>  $backend
      */
     #[DataProvider('backends')]
+    public function test_batches_accept_numeric_keys(array $backend): void
+    {
+        $cache = $this->store($backend);
+
+        $this->assertTrue($cache->putMany([1 => 'one', '20' => 'twenty'], 60));
+        $this->assertTrue($cache->setMultiple([300 => 'three hundred'], 60));
+
+        $this->assertSame([1 => 'one', 20 => 'twenty', 300 => 'three hundred'], $cache->many([1, 20, 300]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $backend
+     */
+    #[DataProvider('backends')]
     public function test_entries_expire_on_laravels_clock(array $backend): void
     {
         $cache = $this->store($backend);
@@ -223,6 +237,22 @@ final class CacheerStoreTest extends TestCase
         $this->assertSame('ten', $ten->get('key'));
     }
 
+    /**
+     * @param  array<string, mixed>  $backend
+     */
+    #[DataProvider('backends')]
+    public function test_flushing_the_cache_leaves_held_locks_held(array $backend): void
+    {
+        $cache = $this->store($backend);
+        $held = $this->cacheerStore($cache)->lock('deploy', 600);
+        $this->assertTrue($held->get());
+
+        $this->assertTrue($cache->flush());
+
+        $this->assertFalse($this->cacheerStore($cache)->lock('deploy', 600)->get());
+        $this->assertTrue($held->release());
+    }
+
     public function test_tags_are_not_offered(): void
     {
         $this->expectException(BadMethodCallException::class);
@@ -340,6 +370,22 @@ final class CacheerStoreTest extends TestCase
         $this->assertFalse($this->cacheerStore($cache)->lock('lease', 10)->get());
     }
 
+    /**
+     * @param  array<string, mixed>  $backend
+     */
+    #[DataProvider('backends')]
+    public function test_refreshing_a_restored_lock_keeps_its_lifetime(array $backend): void
+    {
+        $cache = $this->store($backend);
+        $lock = $this->cacheerStore($cache)->lock('lease', 10);
+        $lock->get();
+
+        $this->assertTrue($this->cacheerStore($cache)->restoreLock('lease', (string) $lock->owner())->refresh());
+
+        $this->travel(11)->seconds();
+        $this->assertTrue($this->cacheerStore($cache)->lock('lease', 10)->get());
+    }
+
     public function test_blocking_on_a_held_lock_times_out(): void
     {
         $cache = $this->store(['backend' => 'array']);
@@ -394,6 +440,12 @@ final class CacheerStoreTest extends TestCase
         $this->assertSame('shop', $cache->getPrefix());
     }
 
+    /**
+     * The cacheer store behind a repository.
+     *
+     * @param  Repository  $cache  The repository.
+     * @return CacheerStore The store.
+     */
     private function cacheerStore(Repository $cache): CacheerStore
     {
         $store = $cache->getStore();
@@ -403,9 +455,15 @@ final class CacheerStoreTest extends TestCase
     }
 }
 
+/**
+ * A unique job for the deduplication test.
+ */
 final class UniqueReport implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable;
 
+    /**
+     * Do nothing; only dispatching matters.
+     */
     public function handle(): void {}
 }
