@@ -6,3 +6,4 @@
 /.phpstan/
 /database/database.sqlite
 /cacheer.log
+/docs/
