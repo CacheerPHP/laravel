@@ -5,7 +5,7 @@
 First release as `cacheerphp/laravel`: CacheerPHP underneath Laravel's cache,
 either beneath the stores an application already has, with the same results and
 no configuration change, or as a `cacheer` driver on CacheerPHP's own stores.
-It requires CacheerPHP 6.1 and replaces the unreleased 0.1 package
+It requires CacheerPHP 6.1.1 and replaces the unreleased 0.1 package
 (`silviooosilva/cacheerphp-laravel`); see "Upgrading from 0.1" in the README.
 The design is in `docs/rfcs/001-run-on-top-of-laravel-cache.md`.
 
@@ -48,8 +48,7 @@ The design is in `docs/rfcs/001-run-on-top-of-laravel-cache.md`.
   nested, and URL connection settings before CacheerPHP uses the connection.
 - Published migrations use explicit table definitions so changing cache store
   configuration cannot redirect rollback to a different table.
-- Laravel stores forward failover telemetry on CacheerPHP 6.1 while remaining
-  compatible with 6.0.
+- Laravel stores forward failover telemetry to CacheerPHP.
 - `Cache::flush()` and `php artisan cache:clear` no longer release held locks:
   lock records live beside the store's keyspace instead of inside it. With an
   empty prefix, flushing still clears the whole backend, locks included.

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Cacheer\Laravel\CacheerStore;
+use Cacheer\Laravel\Routing\RoutedStore;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Cache;
@@ -49,6 +50,20 @@ Cache::flush();
 
 if ($store->get('smoke') !== null) {
     throw new RuntimeException('Cache flush did not remove the value.');
+}
+
+// Laravel's own stores run through CacheerPHP, which needs entries of unknown
+// age (CacheerPHP 6.1.1).
+$native = Cache::store('native');
+
+if (! $native->getStore() instanceof RoutedStore) {
+    throw new RuntimeException('Laravel\'s own file store was not routed through CacheerPHP.');
+}
+
+$native->put('smoke', ['value' => 42], 60);
+
+if ($native->get('smoke') !== ['value' => 42]) {
+    throw new RuntimeException('A routed store did not round-trip.');
 }
 
 echo "Clean Laravel consumer passed with cached configuration.\n";

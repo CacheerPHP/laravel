@@ -94,10 +94,6 @@ final class ServiceProviderTest extends TestCase
 
     public function test_redis_failover_is_reported_to_telemetry(): void
     {
-        if (! defined(CacheEventType::class.'::FallbackServed')) {
-            $this->markTestSkipped('Failover events need CacheerPHP 6.1.');
-        }
-
         $types = [];
         Telemetry::listen(function (CacheEvent $event) use (&$types): void {
             $types[] = $event->type->value;
