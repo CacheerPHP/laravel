@@ -18,16 +18,31 @@ use Silviooosilva\CacheerPhp\Contracts\Clock;
  */
 final class LaravelClock implements Clock
 {
+    /**
+     * The current time.
+     *
+     * @return int Unix seconds, on Laravel's test clock when one is set.
+     */
     public function now(): int
     {
         return Carbon::hasTestNow() ? Carbon::now()->getTimestamp() : time();
     }
 
+    /**
+     * The current time, with microseconds.
+     *
+     * @return float Unix seconds, always on the real clock.
+     */
     public function nowFloat(): float
     {
         return microtime(true);
     }
 
+    /**
+     * Pause on the real clock.
+     *
+     * @param  int  $microseconds  How long to pause.
+     */
     public function sleep(int $microseconds): void
     {
         if ($microseconds > 0) {

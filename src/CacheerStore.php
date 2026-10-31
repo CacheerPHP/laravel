@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Cacheer\Laravel;
 
+use Generator;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Store;
 use InvalidArgumentException;
@@ -27,24 +28,30 @@ final readonly class CacheerStore implements LockProvider, Store
     private Cache $locks;
 
     /**
+     * Create a store over a CacheerPHP cache.
+     *
      * @param  Cache  $cache  The cache values are read from and written to.
-     * @param  Cache|null  $lockCache  The primary cache, without fallback or L1.
-     *                                 Both the guard and the owner record must use
-     *                                 the shared primary throughout an operation.
+     * @param  Cache|null  $locks  The keyspace holding lock records: the primary
+     *                             cache without fallback or L1, so the guard and the
+     *                             owner record share it throughout an operation, and
+     *                             outside the scope of $cache, so flushing values
+     *                             leaves held locks held. Defaults to a scope of $cache.
      * @param  string  $prefix  Reported by {@see self::getPrefix()}; the isolation it
      *                          stands for is already the scope of $cache.
      */
     public function __construct(
         private Cache $cache,
-        ?Cache $lockCache = null,
+        ?Cache $locks = null,
         private string $prefix = '',
     ) {
-        $this->locks = ($lockCache ?? $cache)->in('laravel-locks');
+        $this->locks = $locks ?? $cache->in('laravel-locks');
     }
 
     /**
      * The CacheerPHP cache behind this store, for features `Cache::` cannot
      * express, such as tag invalidation or scoped sub-caches.
+     *
+     * @return Cache The cache values are read from and written to.
      */
     public function cache(): Cache
     {
@@ -52,7 +59,10 @@ final readonly class CacheerStore implements LockProvider, Store
     }
 
     /**
-     * @param  string  $key
+     * Read a value.
+     *
+     * @param  string  $key  The cache key.
+     * @return mixed The value, or null on a miss.
      */
     public function get($key): mixed
     {
@@ -60,8 +70,10 @@ final readonly class CacheerStore implements LockProvider, Store
     }
 
     /**
-     * @param  array<array-key, string>  $keys
-     * @return array<string, mixed>
+     * Read several values at once.
+     *
+     * @param  array<array-key, string>  $keys  The cache keys.
+     * @return array<string, mixed> Each key's value, or null on a miss, in request order.
      */
     public function many(array $keys): array
     {
@@ -69,8 +81,12 @@ final readonly class CacheerStore implements LockProvider, Store
     }
 
     /**
-     * @param  string  $key
-     * @param  int  $seconds
+     * Store a value for a number of seconds.
+     *
+     * @param  string  $key  The cache key.
+     * @param  mixed  $value  The value to store.
+     * @param  int  $seconds  The lifetime; zero or less forgets the entry.
+     * @return bool Always true; failures throw.
      */
     public function put($key, $value, $seconds): bool
     {
@@ -90,8 +106,11 @@ final readonly class CacheerStore implements LockProvider, Store
     }
 
     /**
-     * @param  array<array-key, mixed>  $values
-     * @param  int  $seconds
+     * Store several values for a number of seconds.
+     *
+     * @param  array<array-key, mixed>  $values  The values, by key.
+     * @param  int  $seconds  The lifetime; zero or less forgets the entries.
+     * @return bool Always true; failures throw.
      */
     public function putMany(array $values, $seconds): bool
     {
@@ -103,7 +122,7 @@ final readonly class CacheerStore implements LockProvider, Store
             return true;
         }
 
-        $this->cache->setMany($values, $seconds);
+        $this->cache->setMany(self::stringKeys($values), $seconds);
 
         return true;
     }
@@ -112,9 +131,10 @@ final readonly class CacheerStore implements LockProvider, Store
      * Store only when absent — atomic across processes whenever the store can
      * lock. Laravel's Repository calls this instead of its own get-then-put.
      *
-     * @param  string  $key
-     * @param  mixed  $value
-     * @param  int  $seconds
+     * @param  string  $key  The cache key.
+     * @param  mixed  $value  The value to store.
+     * @param  int  $seconds  The lifetime; zero or less stores nothing.
+     * @return bool Whether the value was stored.
      */
     public function add($key, $value, $seconds): bool
     {
@@ -128,11 +148,13 @@ final readonly class CacheerStore implements LockProvider, Store
     }
 
     /**
-     * A missing counter starts at zero, as it does on Laravel's Redis store; the
-     * new key never expires and an existing key keeps its lifetime.
+     * Increase a counter. A missing counter starts at zero, as it does on
+     * Laravel's Redis store; the new key never expires and an existing key
+     * keeps its lifetime.
      *
-     * @param  string  $key
-     * @param  int|float  $value
+     * @param  string  $key  The cache key.
+     * @param  int|float  $value  The amount, a whole number.
+     * @return int The new value.
      */
     public function increment($key, $value = 1): int
     {
@@ -140,8 +162,11 @@ final readonly class CacheerStore implements LockProvider, Store
     }
 
     /**
-     * @param  string  $key
-     * @param  int|float  $value
+     * Decrease a counter, starting a missing one at zero.
+     *
+     * @param  string  $key  The cache key.
+     * @param  int|float  $value  The amount, a whole number.
+     * @return int The new value.
      */
     public function decrement($key, $value = 1): int
     {
@@ -149,7 +174,11 @@ final readonly class CacheerStore implements LockProvider, Store
     }
 
     /**
-     * @param  string  $key
+     * Store a value that never expires.
+     *
+     * @param  string  $key  The cache key.
+     * @param  mixed  $value  The value to store.
+     * @return bool Always true; failures throw.
      */
     public function forever($key, $value): bool
     {
@@ -162,8 +191,9 @@ final readonly class CacheerStore implements LockProvider, Store
      * Extend a live entry's lifetime without rewriting it. An expired entry is
      * not revived.
      *
-     * @param  string  $key
-     * @param  int  $seconds
+     * @param  string  $key  The cache key.
+     * @param  int  $seconds  The new lifetime; zero or less forgets the entry.
+     * @return bool Whether a live entry was extended.
      */
     public function touch($key, $seconds): bool
     {
@@ -177,7 +207,10 @@ final readonly class CacheerStore implements LockProvider, Store
     }
 
     /**
-     * @param  string  $key
+     * Remove a value.
+     *
+     * @param  string  $key  The cache key.
+     * @return bool Whether an entry was removed.
      */
     public function forget($key): bool
     {
@@ -187,7 +220,10 @@ final readonly class CacheerStore implements LockProvider, Store
     /**
      * Clear this store's keyspace only. With a prefix configured, other
      * applications and stores sharing the backend keep their entries, and
-     * matching is literal, so `app_1` never clears `app_10`.
+     * matching is literal, so `app_1` never clears `app_10`. Held locks stay
+     * held, unless the prefix is empty: then the whole backend is cleared.
+     *
+     * @return bool Always true; failures throw.
      */
     public function flush(): bool
     {
@@ -196,15 +232,23 @@ final readonly class CacheerStore implements LockProvider, Store
         return true;
     }
 
+    /**
+     * The prefix this store was configured with.
+     *
+     * @return string The prefix, or an empty string.
+     */
     public function getPrefix(): string
     {
         return $this->prefix;
     }
 
     /**
-     * @param  string  $name
+     * Create a lock, not yet acquired.
+     *
+     * @param  string  $name  The lock name.
      * @param  int  $seconds  Zero holds the lock until it is released.
-     * @param  string|null  $owner
+     * @param  string|null  $owner  The owner token, or null for a new one.
+     * @return CacheerLock The lock.
      */
     public function lock($name, $seconds = 0, $owner = null): CacheerLock
     {
@@ -215,8 +259,9 @@ final readonly class CacheerStore implements LockProvider, Store
      * Rebuild a lock held by $owner, typically in another process, so that
      * process's lock can be released here.
      *
-     * @param  string  $name
-     * @param  string  $owner
+     * @param  string  $name  The lock name.
+     * @param  string  $owner  The owner token of the holder.
+     * @return CacheerLock The lock, owned by $owner.
      */
     public function restoreLock($name, $owner): CacheerLock
     {
@@ -224,8 +269,24 @@ final readonly class CacheerStore implements LockProvider, Store
     }
 
     /**
+     * PHP turns numeric array keys into integers, which CacheerPHP batches refuse.
+     *
+     * @param  array<array-key, mixed>  $values  The values, by key.
+     * @return Generator<string, mixed> The same values, keyed by strings.
+     */
+    private static function stringKeys(array $values): Generator
+    {
+        foreach ($values as $key => $value) {
+            yield (string) $key => $value;
+        }
+    }
+
+    /**
      * CacheerPHP counters are integers; a fractional amount would be silently
      * truncated, so it is rejected instead.
+     *
+     * @param  mixed  $value  The amount Laravel passed.
+     * @return int The amount as an integer.
      */
     private static function amount(mixed $value): int
     {

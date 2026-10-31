@@ -5,25 +5,43 @@ declare(strict_types=1);
 namespace Cacheer\Laravel\Tests;
 
 use Cacheer\Laravel\CacheerServiceProvider;
+use Cacheer\Laravel\StoreFactory;
 use Illuminate\Cache\Repository;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Silviooosilva\CacheerPhp\Stores\Support\DatabaseStoreSchema;
 
+/**
+ * A Laravel application with the package loaded, and helpers to build cacheer stores.
+ */
 abstract class TestCase extends Orchestra
 {
     private ?string $directory = null;
 
     private int $stores = 0;
 
+    private bool $redisCleared = false;
+
+    /**
+     * The package's service provider.
+     *
+     * @param  Application  $app  The application.
+     * @return list<class-string> The providers to load.
+     */
     protected function getPackageProviders($app): array
     {
         return [CacheerServiceProvider::class];
     }
 
+    /**
+     * Use the `testing` cache prefix and an in-memory SQLite database.
+     *
+     * @param  Application  $app  The application.
+     */
     protected function defineEnvironment($app): void
     {
         $app['config']->set('cache.prefix', 'testing');
@@ -35,6 +53,9 @@ abstract class TestCase extends Orchestra
         ]);
     }
 
+    /**
+     * Remove the test's temporary directory.
+     */
     protected function tearDown(): void
     {
         if ($this->directory !== null) {
@@ -72,7 +93,9 @@ abstract class TestCase extends Orchestra
      * A fresh cacheer store under its own name, with the backend prepared
      * (temporary directory, schema, isolated redis keyspace).
      *
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $config  The store's options, without the driver.
+     * @param  string|null  $name  The store name, or null for a new one.
+     * @return Repository The store.
      */
     protected function store(array $config, ?string $name = null): Repository
     {
@@ -92,22 +115,33 @@ abstract class TestCase extends Orchestra
             $config['redis_prefix'] ??= 'cacheer_laravel_test';
         }
 
+        // Lock records outlive a prefixed flush, so the first redis store of a
+        // test clears the whole test keyspace through an unprefixed store.
+        if (($config['backend'] ?? null) === 'redis' && ! $this->redisCleared) {
+            $this->redisCleared = true;
+            $this->app?->make(StoreFactory::class)->make(['prefix' => ''] + $config)->flush();
+        }
+
         Config::set("cache.stores.{$name}", $config);
         $store = Cache::store($name);
         $this->assertInstanceOf(Repository::class, $store);
 
-        if (($config['backend'] ?? null) === 'redis') {
-            $store->flush();
-        }
-
         return $store;
     }
 
+    /**
+     * A temporary directory for this test, removed afterwards.
+     *
+     * @return string The directory path.
+     */
     protected function directory(): string
     {
         return $this->directory ??= sys_get_temp_dir().'/cacheer-laravel-'.bin2hex(random_bytes(6));
     }
 
+    /**
+     * Configure the `cacheer_test` redis connection on database 15.
+     */
     protected function useRedis(): void
     {
         Config::set('database.redis.client', getenv('CACHEER_TEST_REDIS_CLIENT') ?: 'predis');

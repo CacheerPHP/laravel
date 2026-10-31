@@ -17,6 +17,9 @@ use Silviooosilva\CacheerPhp\Contracts\Cache;
  */
 final class CacheerServiceProvider extends ServiceProvider
 {
+    /**
+     * Register the `cacheer` driver and the CacheerPHP `Cache` binding.
+     */
     #[\Override]
     public function register(): void
     {
@@ -41,6 +44,9 @@ final class CacheerServiceProvider extends ServiceProvider
         });
     }
 
+    /**
+     * Offer the database backend's migration for publishing.
+     */
     public function boot(): void
     {
         $this->publishesMigrations([
@@ -51,6 +57,9 @@ final class CacheerServiceProvider extends ServiceProvider
     /**
      * The default cache store when it uses the cacheer driver, otherwise the
      * first store that does.
+     *
+     * @param  Config  $config  The application's configuration.
+     * @return string The store name.
      */
     private static function cacheerStore(Config $config): string
     {

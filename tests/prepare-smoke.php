@@ -42,7 +42,12 @@ return [
 
 PHP);
 
-/** @return array<mixed> */
+/**
+ * Read a Composer manifest.
+ *
+ * @param  string  $path  The manifest path.
+ * @return array<mixed> The manifest.
+ */
 function readSmokeManifest(string $path): array
 {
     $contents = file_get_contents($path);
